@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_admin
 from app.database import get_db
 from app.models import License, ExpertAdvisor, Admin
 from app.schemas import (
@@ -32,7 +33,7 @@ def create_license(
     expires_at = datetime.utcnow() + timedelta(days=data.duration_days)
 
     new_license = License(
-        admin_id=current_admin.id,
+        admin_id=ea.admin_id,
         ea_id=data.ea_id,
         client_name=data.client_name,
         client_email=data.client_email,
