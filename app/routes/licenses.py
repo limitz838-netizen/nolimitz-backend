@@ -12,7 +12,6 @@ from app.schemas import (
     LicenseValidateResponse,
     LicenseResponse,
 )
-from app.auth import get_current_admin
 
 router = APIRouter(prefix="/admin", tags=["Licenses"])
 
@@ -21,11 +20,9 @@ router = APIRouter(prefix="/admin", tags=["Licenses"])
 def create_license(
     data: LicenseCreateRequest,
     db: Session = Depends(get_db),
-    current_admin: Admin = Depends(get_current_admin),
 ):
     ea = db.query(ExpertAdvisor).filter(
         ExpertAdvisor.id == data.ea_id,
-        ExpertAdvisor.admin_id == current_admin.id,
     ).first()
 
     if not ea:
