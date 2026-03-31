@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite:///./nolimitz_saas.db"
+DATABASE_URL = "sqlite:///C:/Nolimitz/nolimitz_saas_backend/nolimitz_saas.db"
 
 engine = create_engine(
     DATABASE_URL,

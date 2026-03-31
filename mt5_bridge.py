@@ -8,10 +8,19 @@ import MetaTrader5 as mt5
 # =========================
 # SETTINGS
 # =========================
-LICENSE_KEY = "NL-4B72F9125A"
-BACKEND_URL = "http://127.0.0.1:8001"
-POLL_INTERVAL = 2
-EXECUTE_TRADES = True
+import json
+
+# Load config
+with open("config.json") as f:
+    config = json.load(f)
+
+LICENSE_KEY = config["license_key"]
+BACKEND_URL = config["backend_url"]
+POLL_INTERVAL = config["poll_interval"]
+EXECUTE_TRADES = config["execute_trades"]
+MT5_LOGIN = config["mt5_login"]
+MT5_PASSWORD = config["mt5_password"]
+MT5_SERVER = config["mt5_server"]
 
 # Only execute signals created after the bridge starts
 BRIDGE_STARTED_AT = datetime.now(timezone.utc)
@@ -45,15 +54,27 @@ def connect_mt5() -> bool:
         print("❌ MT5 initialize failed:", mt5.last_error())
         return False
 
+    authorized = mt5.login(
+        login=MT5_LOGIN,
+        password=MT5_PASSWORD,
+        server=MT5_SERVER
+    )
+
+    if not authorized:
+        print("❌ MT5 login failed:", mt5.last_error())
+        mt5.shutdown()
+        return False
+
     account = mt5.account_info()
     if account is None:
-        print("❌ MT5 connected, but no account is logged in.")
+        print("❌ MT5 connected but no account info")
         return False
 
     print("✅ MT5 connected")
     print("Account login:", account.login)
     print("Server:", account.server)
     print("Balance:", account.balance)
+
     return True
 
 

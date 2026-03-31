@@ -1,0 +1,9 @@
+{
+  "license_key": "NL-4B72F9125A",
+  "backend_url": "https://nolimitz-backend.onrender.com",
+  "poll_interval": 2,
+  "execute_trades": true,
+  "mt5_login": 105505352,
+  "mt5_password": "${(Ilpd7",
+  "mt5_server": "FBS-Demo"
+}

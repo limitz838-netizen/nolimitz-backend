@@ -1,4 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel 
 from typing import Optional
 
 
@@ -143,6 +145,28 @@ class ClientMT5ConnectResponse(BaseModel):
     mt_server: Optional[str] = None
     broker_name: Optional[str] = None
     is_connected: bool
+    
+class ClientMT5SaveRequest(BaseModel):
+    license_key: str
+    mt_login: str
+    mt_password: str
+    mt_server: str
+    execute_trades: bool = True
+    lot_size: float = 0.01
+
+
+class ClientMT5Response(BaseModel):
+    license_key: str
+    mt_login: str
+    mt_server: str
+    execute_trades: bool
+    lot_size: float
+
+
+class ClientMT5StatusResponse(BaseModel):
+    saved: bool
+    message: str
+
 
 class SignalCreateRequest(BaseModel):
     ea_id: int
@@ -191,5 +215,50 @@ class ClientSymbolSettingOut(BaseModel):
     max_trades: str
     is_enabled: bool
 
-class Config:
-    from_attributes = True
+    class Config:
+        from_attributes = True
+
+
+class TradeExecutionResponse(BaseModel):
+    id: int
+    license_id: int
+    signal_id: int | None = None
+    symbol: str
+    action: str
+    success: bool
+    message: str | None = None
+    order_id: str | None = None
+    created_at: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ClientExecutionToggleRequest(BaseModel):
+    license_key: str
+    execute_trades: bool
+
+class ExecutionJobResponse(BaseModel):
+    id: int
+    license_id: int
+    signal_id: int
+    symbol: str
+    action: str
+    volume: float
+    stop_loss: float | None = None
+    take_profit: float | None = None
+    status: str
+    worker_name: str | None = None
+    error_message: str | None = None
+    created_at: datetime | None = None
+    processed_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class ExecutionJobUpdateRequest(BaseModel):
+    status: str
+    worker_name: str | None = None
+    error_message: str | None = None
+    processed_at: datetime | None = None

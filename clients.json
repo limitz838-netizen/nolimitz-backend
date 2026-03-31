@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Client 1",
+    "license_key": "NL-4B72F9125A",
+    "mt5_login": 105505352,
+    "mt5_password": "YOUR_PASSWORD_1",
+    "mt5_server": "FBS-Demo",
+    "execute_trades": true
+  },
+  {
+    "name": "Client 2",
+    "license_key": "NL-3304B8D0A7",
+    "mt5_login": 435139573,
+    "mt5_password": "YOUR_PASSWORD_2",
+    "mt5_server": "Exness-MT5Trial9",
+    "execute_trades": true
+  }
+]

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -87,11 +88,17 @@ class ClientAccount(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     license_id = Column(Integer, ForeignKey("licenses.id"), unique=True, nullable=False)
-    mt_login = Column(String, nullable=True)
-    mt_password = Column(String, nullable=True)
-    mt_server = Column(String, nullable=True)
+
+    mt_login = Column(String, nullable=False)
+    mt_password = Column(String, nullable=False)
+    mt_server = Column(String, nullable=False)
+
     broker_name = Column(String, nullable=True)
     is_connected = Column(Boolean, default=False)
+
+    execute_trades = Column(Boolean, default=True)
+    lot_size = Column(Float, default=0.01)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     license = relationship("License", back_populates="client_account")
@@ -127,3 +134,44 @@ class ClientSymbolSetting(Base):
     is_enabled = Column(Boolean, default=True)
 
     license = relationship("License")
+
+class TradeExecution(Base):
+    __tablename__ = "trade_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    license_id = Column(Integer, ForeignKey("licenses.id"))
+    signal_id = Column(Integer, ForeignKey("signals.id"))
+
+    symbol = Column(String)
+    action = Column(String)
+
+    success = Column(Boolean, default=False)
+    message = Column(String)
+    order_id = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ExecutionJob(Base):
+    __tablename__ = "execution_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), nullable=False)
+    signal_id = Column(Integer, ForeignKey("signals.id"), nullable=False)
+
+    symbol = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    volume = Column(Float, default=0.01)
+    stop_loss = Column(Float, nullable=True)
+    take_profit = Column(Float, nullable=True)
+
+    mt_login = Column(String)
+    mt_password = Column(String)
+    mt_server = Column(String)
+
+    status = Column(String, default="pending")  # pending, processing, success, failed
+    worker_name = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)

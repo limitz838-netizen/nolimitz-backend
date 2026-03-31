@@ -124,3 +124,26 @@ def validate_license(
         "status": license_obj.status,
         "ea_id": license_obj.ea_id,
     }
+
+@router.get("/test/create-license")
+def create_test_license(db: Session = Depends(get_db)):
+    license_key = f"NL-{uuid.uuid4().hex[:10].upper()}"
+
+    new_license = License(
+        admin_id=1,
+        ea_id=1,
+        client_name="Test User",
+        client_email="test@gmail.com",
+        license_key=license_key,
+        duration_days=30,
+        expires_at=datetime.utcnow() + timedelta(days=30),
+        status="active",
+    )
+
+    db.add(new_license)
+    db.commit()
+    db.refresh(new_license)
+
+    return {
+        "license_key": new_license.license_key
+    }
