@@ -1,7 +1,7 @@
 import random
 import string
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
@@ -37,7 +37,6 @@ def get_current_admin(
     return admin
 
 
-# 🔑 Generate license key like NL-XXXXXXXXXX
 def generate_license_key(db: Session):
     while True:
         random_part = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
@@ -46,6 +45,21 @@ def generate_license_key(db: Session):
         existing = db.query(License).filter(License.license_key == key).first()
         if not existing:
             return key
+
+
+def calculate_expiry(duration: str) -> Optional[datetime]:
+    now = datetime.utcnow()
+
+    if duration == "30days":
+        return now + timedelta(days=30)
+    elif duration == "1month":
+        return now + timedelta(days=30)
+    elif duration == "1year":
+        return now + timedelta(days=365)
+    elif duration == "lifetime":
+        return now + timedelta(days=36500)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid duration selected")
 
 
 @router.post("/generate", response_model=LicenseResponse)
@@ -77,18 +91,18 @@ def generate_license(
         "company_name": profile.company_name if profile else None,
     }
 
-    expires_at = datetime.utcnow() + timedelta(days=payload.duration_days)
+    expires_at = calculate_expiry(payload.duration)
 
     license = License(
-        admin_id=current_admin.id,
-        ea_id=ea.id,
-        license_key=generate_license_key(db),
-        client_name=payload.client_name,
-        client_email=payload.client_email,
-        mode_type=ea.mode_type,
-        expires_at=expires_at,
-        is_active=True,
-        branding_snapshot=branding,
+       admin_id=current_admin.id,
+       ea_id=ea.id,
+       license_key=generate_license_key(db),
+       client_name=payload.client_name,
+       client_email=payload.client_email,
+       mode_type="both",
+       expires_at=expires_at,
+       is_active=True,
+       branding_snapshot=branding,
     )
 
     db.add(license)
@@ -102,9 +116,9 @@ def generate_license(
             license_key=license.license_key,
             client_name=license.client_name,
             client_email=license.client_email,
-            mode_type=license.mode_type,
             expires_at=license.expires_at,
             is_active=license.is_active,
+            mode_type=license.mode_type,  # ✅ ADD THIS
         )
     )
 
@@ -124,9 +138,9 @@ def list_licenses(
             license_key=l.license_key,
             client_name=l.client_name,
             client_email=l.client_email,
-            mode_type=l.mode_type,
             expires_at=l.expires_at,
             is_active=l.is_active,
+            mode_type=l.mode_type,
         )
         for l in licenses
     ]

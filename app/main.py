@@ -13,6 +13,11 @@ from app.routers.admin import router as admin_router
 from app.routers.ea import router as ea_router
 from app.routers.license import router as license_router
 from app.routers.client import router as client_router
+from app.routers.signals import router as signals_router
+from app.routers.robot import router as robot_router
+from app.routers.copier import router as copier_router
+from app.routers import mt5_workers
+from app.routers.master_account import router as master_account_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -56,7 +61,14 @@ seed_super_admin()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://nolimitzbots.co.ke",
+        "https://www.nolimitzbots.co.ke",
+        "https://api.nolimitzpro.top",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://192.168.1.192:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,6 +80,11 @@ app.include_router(admin_router)
 app.include_router(ea_router)
 app.include_router(license_router)
 app.include_router(client_router)
+app.include_router(signals_router)
+app.include_router(robot_router)
+app.include_router(copier_router)
+app.include_router(mt5_workers.router)
+app.include_router(master_account_router)
 
 @app.get("/")
 def root(): 

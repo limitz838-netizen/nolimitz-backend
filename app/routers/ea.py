@@ -1,10 +1,12 @@
+import random
+import string
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Admin, ExpertAdvisor, EASymbol
+from app.models import Admin, ExpertAdvisor, EASymbol, AdminEALink
 from app.schemas import (
     EACreateRequest,
     EAUpdateRequest,
@@ -12,6 +14,8 @@ from app.schemas import (
     EAItem,
     EASymbolItem,
     BasicMessageResponse,
+    EALinkRequest,
+    EALinkItem,
 )
 from app.auth import decode_access_token
 
@@ -44,22 +48,33 @@ def get_current_admin(
     return admin
 
 
+def generate_ea_code(db: Session, admin_code: int) -> str:
+    while True:
+        random_part = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        ea_code = f"EA-NL-{admin_code}-{random_part}"
+
+        existing = db.query(ExpertAdvisor).filter(ExpertAdvisor.ea_code == ea_code).first()
+        if not existing:
+            return ea_code
+
+
 @router.post("/", response_model=EAItem)
 def create_ea(
     payload: EACreateRequest,
     current_admin: Admin = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    if payload.mode_type not in ["signal", "robot"]:
-        raise HTTPException(status_code=400, detail="mode_type must be 'signal' or 'robot'")
+  
 
     ea = ExpertAdvisor(
         admin_id=current_admin.id,
         name=payload.name,
         code_name=payload.code_name,
+        ea_code=generate_ea_code(db, current_admin.admin_code),
         version=payload.version,
         description=payload.description,
-        mode_type=payload.mode_type,
+        mode_type="both",
+        is_shareable=payload.is_shareable,
         is_active=True,
     )
     db.add(ea)
@@ -70,9 +85,10 @@ def create_ea(
         id=ea.id,
         name=ea.name,
         code_name=ea.code_name,
+        ea_code=ea.ea_code,
         version=ea.version,
         description=ea.description,
-        mode_type=ea.mode_type,
+        is_shareable=ea.is_shareable,
         is_active=ea.is_active,
         symbols=[],
     )
@@ -97,9 +113,10 @@ def list_my_eas(
                 id=ea.id,
                 name=ea.name,
                 code_name=ea.code_name,
+                ea_code=ea.ea_code,
                 version=ea.version,
                 description=ea.description,
-                mode_type=ea.mode_type,
+                is_shareable=ea.is_shareable,
                 is_active=ea.is_active,
                 symbols=[
                     EASymbolItem(
@@ -132,9 +149,10 @@ def get_ea(
         id=ea.id,
         name=ea.name,
         code_name=ea.code_name,
+        ea_code=ea.ea_code,
         version=ea.version,
         description=ea.description,
-        mode_type=ea.mode_type,
+        is_shareable=ea.is_shareable,
         is_active=ea.is_active,
         symbols=[
             EASymbolItem(
@@ -162,8 +180,6 @@ def update_ea(
     if not ea:
         raise HTTPException(status_code=404, detail="EA not found")
 
-    if payload.mode_type is not None and payload.mode_type not in ["signal", "robot"]:
-        raise HTTPException(status_code=400, detail="mode_type must be 'signal' or 'robot'")
 
     if payload.name is not None:
         ea.name = payload.name
@@ -173,8 +189,8 @@ def update_ea(
         ea.version = payload.version
     if payload.description is not None:
         ea.description = payload.description
-    if payload.mode_type is not None:
-        ea.mode_type = payload.mode_type
+    if payload.is_shareable is not None:
+        ea.is_shareable = payload.is_shareable
     if payload.is_active is not None:
         ea.is_active = payload.is_active
 
@@ -185,9 +201,10 @@ def update_ea(
         id=ea.id,
         name=ea.name,
         code_name=ea.code_name,
+        ea_code=ea.ea_code,
         version=ea.version,
         description=ea.description,
-        mode_type=ea.mode_type,
+        is_shareable=ea.is_shareable,
         is_active=ea.is_active,
         symbols=[
             EASymbolItem(
@@ -241,9 +258,10 @@ def save_ea_symbols(
         id=ea.id,
         name=ea.name,
         code_name=ea.code_name,
+        ea_code=ea.ea_code,
         version=ea.version,
         description=ea.description,
-        mode_type=ea.mode_type,
+        is_shareable=ea.is_shareable,
         is_active=ea.is_active,
         symbols=[
             EASymbolItem(
@@ -294,3 +312,84 @@ def deactivate_ea(
     db.commit()
 
     return BasicMessageResponse(message="EA deactivated successfully")
+
+
+@router.post("/link/by-code", response_model=EALinkItem)
+def link_ea_by_code(
+    payload: EALinkRequest,
+    current_admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    source_ea = db.query(ExpertAdvisor).filter(
+        ExpertAdvisor.ea_code == payload.ea_code
+    ).first()
+
+    if not source_ea:
+        raise HTTPException(status_code=404, detail="EA code not found")
+
+    if not source_ea.is_shareable:
+        raise HTTPException(status_code=403, detail="This EA is not shareable")
+
+    if source_ea.admin_id == current_admin.id:
+        raise HTTPException(status_code=400, detail="You cannot link your own EA")
+
+    existing = db.query(AdminEALink).filter(
+        AdminEALink.source_ea_id == source_ea.id,
+        AdminEALink.target_admin_id == current_admin.id,
+    ).first()
+
+    if existing:
+        return EALinkItem(
+            id=existing.id,
+            source_admin_id=existing.source_admin_id,
+            target_admin_id=existing.target_admin_id,
+            source_ea_id=existing.source_ea_id,
+            source_ea_code=existing.source_ea_code,
+            status=existing.status,
+            is_active=existing.is_active,
+        )
+
+    link = AdminEALink(
+        source_admin_id=source_ea.admin_id,
+        target_admin_id=current_admin.id,
+        source_ea_id=source_ea.id,
+        source_ea_code=source_ea.ea_code,
+        status="approved",
+        is_active=True,
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+
+    return EALinkItem(
+        id=link.id,
+        source_admin_id=link.source_admin_id,
+        target_admin_id=link.target_admin_id,
+        source_ea_id=link.source_ea_id,
+        source_ea_code=link.source_ea_code,
+        status=link.status,
+        is_active=link.is_active,
+    )
+
+
+@router.get("/links/mine", response_model=List[EALinkItem])
+def list_my_linked_eas(
+    current_admin: Admin = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    links = db.query(AdminEALink).filter(
+        AdminEALink.target_admin_id == current_admin.id
+    ).order_by(AdminEALink.id.desc()).all()
+
+    return [
+        EALinkItem(
+            id=link.id,
+            source_admin_id=link.source_admin_id,
+            target_admin_id=link.target_admin_id,
+            source_ea_id=link.source_ea_id,
+            source_ea_code=link.source_ea_code,
+            status=link.status,
+            is_active=link.is_active,
+        )
+        for link in links
+    ]
