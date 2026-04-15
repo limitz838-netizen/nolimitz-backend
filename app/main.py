@@ -28,15 +28,18 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def seed_super_admin():
+    email = os.getenv("SUPERADMIN_EMAIL", "superadmin@nolimitz.com")
+    password = os.getenv("SUPERADMIN_PASSWORD", "admin12345")
+
     db: Session = SessionLocal()
     try:
-        existing = db.query(Admin).filter(Admin.email == "superadmin@nolimitz.com").first()
+        existing = db.query(Admin).filter(Admin.email == email).first()
         if not existing:
             super_admin = Admin(
                 admin_code=100,
                 full_name="Super Admin",
-                email="superadmin@nolimitz.com",
-                password_hash=hash_password("admin12345"),
+                email=email,
+                password_hash=hash_password(password),
                 role="super_admin",
                 is_approved=True,
                 is_active=True,
@@ -64,10 +67,8 @@ app.add_middleware(
     allow_origins=[
         "https://nolimitzbots.co.ke",
         "https://www.nolimitzbots.co.ke",
-        "https://api.nolimitzpro.top",
+        "https://nolimitz-admin-orn6h91o2-limitz838-2833s-projects.vercel.app",
         "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://192.168.1.192:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],

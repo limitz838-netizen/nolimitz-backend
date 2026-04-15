@@ -5,7 +5,7 @@ from typing import Optional
 import MetaTrader5 as mt5
 import requests
 
-BACKEND_URL = "https://api.nolimitzpro.top"
+BACKEND_URL = "https://nolimitz-backend-yfne.onrender.com"
 POLL_SECONDS = 5
 CLAIM_LIMIT = 10
 MAX_OPEN_EVENT_AGE_SECONDS = 60

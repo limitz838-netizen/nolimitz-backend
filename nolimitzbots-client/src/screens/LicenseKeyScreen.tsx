@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,7 +18,9 @@ import { Colors } from "../theme/colors";
 import { Radius } from "../theme/radius";
 import { Spacing } from "../theme/spacing";
 
-const API_BASE = "https://dazedly-nondark-lise.ngrok-free.dev";
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL || "https://nolimitz-backend-yfne.onrender.com";
+
 const DEVICE_ID_KEY = "nolimitzbots_device_id";
 
 type VerifiedPayload = {
@@ -35,7 +44,7 @@ async function getOrCreateDeviceId(): Promise<string> {
 
   const generated =
     Application.androidId ||
-     `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
   await SecureStore.setItemAsync(DEVICE_ID_KEY, generated);
   return generated;
@@ -49,10 +58,10 @@ export default function LicenseKeyScreen({
   const [loading, setLoading] = useState(false);
 
   const handleVerify = async () => {
-    const cleanKey = licenseKey.trim();
+    const cleanKey = licenseKey.trim().toUpperCase();
 
     if (!cleanKey) {
-      Alert.alert("Missing key", "Please enter your license key.");
+      Alert.alert("Missing Key", "Please enter your license key.");
       return;
     }
 
@@ -73,12 +82,19 @@ export default function LicenseKeyScreen({
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text();
+
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         Alert.alert(
           "Verification Failed",
-          data?.detail || "License verification failed."
+          data?.detail || data?.message || "License verification failed."
         );
         return;
       }
@@ -167,7 +183,7 @@ export default function LicenseKeyScreen({
     } catch (error) {
       Alert.alert(
         "Connection Error",
-        "Could not reach backend. Make sure laptop and phone are on the same Wi-Fi."
+        "Could not reach the server. Please check your internet connection and try again."
       );
     } finally {
       setLoading(false);
@@ -199,15 +215,23 @@ export default function LicenseKeyScreen({
               placeholderTextColor="rgba(255,255,255,0.45)"
               style={styles.input}
               autoCapitalize="characters"
+              autoCorrect={false}
               editable={!loading}
             />
 
             <Pressable
-              style={[styles.verifyButton, loading && styles.verifyButtonDisabled]}
+              style={[
+                styles.verifyButton,
+                loading && styles.verifyButtonDisabled,
+              ]}
               onPress={handleVerify}
               disabled={loading}
             >
-              <Ionicons name="shield-checkmark-outline" size={18} color="#08344C" />
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={18}
+                color="#08344C"
+              />
               <Text style={styles.verifyButtonText}>
                 {loading ? "Verifying..." : "Verify"}
               </Text>

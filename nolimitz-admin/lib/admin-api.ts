@@ -1,7 +1,7 @@
 const ADMIN_TOKEN_KEY = "admin_token";
 
 export function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.nolimitzpro.top";
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "https://nolimitz-backend-yfne.onrender.com";
 }
 
 export function getAdminToken() {

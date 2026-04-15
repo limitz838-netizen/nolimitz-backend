@@ -10,7 +10,7 @@ import requests
 MT5_PATH = r"C:\Users\user\Desktop\NolimitzMT5Verifier\terminal64.exe"
 
 # ✅ FIXED API
-API_URL = "https://api.nolimitzpro.top"
+API_URL = "https://nolimitz-backend-yfne.onrender.com"
 
 ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZG1pbl9pZCI6MiwiZW1haWwiOiIxMjNsaW1pdHpAZ21haWwuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzc2MTk4MDM4fQ.KLzgrYTGKHRC66pYWDC5Ede3uEZliN7VJIGzx2dn5KI"
 

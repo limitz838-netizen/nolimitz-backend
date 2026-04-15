@@ -35,7 +35,7 @@ from app.security import decrypt_text, encrypt_text
 
 router = APIRouter(prefix="/client", tags=["Client"])
 
-MT5_VERIFY_URL = "http://127.0.0.1:8011/verify-mt5"
+MT5_VERIFY_URL = "https://dazedly-nondark-lise.ngrok-free.dev/verify-mt5"
 MT5_VERIFY_TIMEOUT_SECONDS = 30
 
 

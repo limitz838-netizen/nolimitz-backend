@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,13 +29,7 @@ type PairConfig = {
   enabled: boolean;
 };
 
-type AllowedEASymbol = {
-  id?: number;
-  symbol_name: string;
-};
-
 type SymbolsListItem = {
-  id: number;
   symbol_name: string;
   trade_direction: DirectionType;
   lot_size: string;
@@ -48,146 +42,131 @@ type SymbolsScreenProps = {
   onBack?: () => void;
   licenseKey: string;
   onSymbolsStatusChange?: (configured: boolean) => void;
+  robotName?: string;
 };
 
-const API_BASE_URL = "https://dazedly-nondark-lise.ngrok-free.dev";
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || "https://nolimitz-backend-yfne.onrender.com";
 
 export default function SymbolsScreen({
   onBack,
   licenseKey,
   onSymbolsStatusChange,
+  robotName = "Robot",
 }: SymbolsScreenProps) {
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [configuredPairs, setConfiguredPairs] = useState<Record<string, PairConfig>>({});
-  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [lotSize, setLotSize] = useState("0.01");
   const [direction, setDirection] = useState<DirectionType>("both");
   const [trades, setTrades] = useState("1");
   const [maxOpenTrades, setMaxOpenTrades] = useState("1");
 
   const [loading, setLoading] = useState(false);
-  const [listLoading, setListLoading] = useState(true);
   const [availableLoading, setAvailableLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(true);
 
-  const configuredList = useMemo(() => Object.values(configuredPairs), [configuredPairs]);
+  const configuredList = Object.values(configuredPairs);
 
-  const fetchAvailableSymbols = async () => {
-  if (!licenseKey.trim()) {
-    setAvailableSymbols([]);
-    setAvailableLoading(false);
-    return;
-  }
-
-  try {
-    setAvailableLoading(true);
-
-    const response = await fetch(`${API_BASE_URL}/client/symbols/allowed`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        license_key: licenseKey,
-      }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data?.detail || "Failed to load allowed symbols");
-    }
-
-    let symbolsFromBackend: string[] = [];
-
-    if (Array.isArray(data)) {
-      symbolsFromBackend = data
-        .map((item: any) =>
-          typeof item === "string"
-            ? item
-            : item?.symbol_name || item?.symbol || item?.name
-        )
-        .filter(Boolean);
-    } else if (Array.isArray(data?.symbols)) {
-      symbolsFromBackend = data.symbols
-        .map((item: any) =>
-          typeof item === "string"
-            ? item
-            : item?.symbol_name || item?.symbol || item?.name
-        )
-        .filter(Boolean);
-    } else if (Array.isArray(data?.allowed_symbols)) {
-      symbolsFromBackend = data.allowed_symbols
-        .map((item: any) =>
-          typeof item === "string"
-            ? item
-            : item?.symbol_name || item?.symbol || item?.name
-        )
-        .filter(Boolean);
-    }
-
-    setAvailableSymbols([...new Set(symbolsFromBackend)]);
-  } catch (error) {
-    setAvailableSymbols([]);
-    Alert.alert("Load Failed", "Could not load robot symbols from backend.");
-  } finally {
-    setAvailableLoading(false);
-  }
-};
-
-  const fetchSavedSymbols = async () => {
+  // Fetch available symbols from backend
+  const fetchAvailableSymbols = useCallback(async () => {
     if (!licenseKey.trim()) {
-      setListLoading(false);
+      setAvailableSymbols([]);
+      setAvailableLoading(false);
+      return;
+    }
+
+    try {
+      setAvailableLoading(true);
+      const response = await fetch(`${API_BASE_URL}/client/symbols/allowed`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ license_key: licenseKey }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData?.detail || "Failed to load symbols");
+      }
+
+      const data = await response.json().catch(() => []);
+      let symbols: string[] = [];
+
+      if (Array.isArray(data)) {
+        symbols = data
+          .map((item: any) => typeof item === "string" ? item : item?.symbol_name || item?.symbol)
+          .filter(Boolean);
+      } else if (Array.isArray(data?.symbols)) {
+        symbols = data.symbols
+          .map((item: any) => typeof item === "string" ? item : item?.symbol_name || item?.symbol)
+          .filter(Boolean);
+      } else if (Array.isArray(data?.allowed_symbols)) {
+        symbols = data.allowed_symbols
+          .map((item: any) => typeof item === "string" ? item : item?.symbol_name || item?.symbol)
+          .filter(Boolean);
+      }
+
+      setAvailableSymbols([...new Set(symbols)]);
+    } catch (error) {
+      console.error("Fetch available symbols error:", error);
+      setAvailableSymbols([]);
+      Alert.alert("Error", "Could not load available symbols.");
+    } finally {
+      setAvailableLoading(false);
+    }
+  }, [licenseKey]);
+
+  // Fetch already configured symbols
+  const fetchSavedSymbols = useCallback(async () => {
+    if (!licenseKey.trim()) {
+      setConfiguredPairs({});
       onSymbolsStatusChange?.(false);
+      setListLoading(false);
       return;
     }
 
     try {
       setListLoading(true);
-
       const response = await fetch(`${API_BASE_URL}/client/symbols/list`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          license_key: licenseKey,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ license_key: licenseKey }),
       });
+
+      if (!response.ok) throw new Error("Failed to load saved symbols");
 
       const data: SymbolsListItem[] = await response.json().catch(() => []);
 
-      if (!response.ok) {
-        throw new Error("Failed to load symbol settings");
-      }
-
       const mapped: Record<string, PairConfig> = {};
 
-      for (const item of data) {
+      data.forEach((item) => {
         mapped[item.symbol_name] = {
           symbol: item.symbol_name,
-          lotSize: item.lot_size,
+          lotSize: item.lot_size || "0.01",
           direction: item.trade_direction,
           trades: String(item.trades_per_signal || 1),
           maxOpenTrades: String(item.max_open_trades || 1),
-          enabled: item.enabled,
+          enabled: item.enabled ?? true,
         };
-      }
+      });
 
       setConfiguredPairs(mapped);
       onSymbolsStatusChange?.(Object.keys(mapped).length > 0);
     } catch (error) {
+      console.error("Fetch saved symbols error:", error);
       onSymbolsStatusChange?.(false);
     } finally {
       setListLoading(false);
     }
-  };
+  }, [licenseKey, onSymbolsStatusChange]);
 
   useEffect(() => {
     fetchAvailableSymbols();
     fetchSavedSymbols();
-  }, [licenseKey]);
+  }, [fetchAvailableSymbols, fetchSavedSymbols]);
 
+  // Open configuration modal
   const openConfigModal = (symbol: string) => {
     const existing = configuredPairs[symbol];
 
@@ -202,11 +181,20 @@ export default function SymbolsScreen({
     setSelectedSymbol(null);
   };
 
+  // Save symbol configuration
   const savePairConfig = async () => {
-    if (!selectedSymbol) return;
+    if (!selectedSymbol || !licenseKey.trim()) {
+      Alert.alert("Error", "Missing symbol or license.");
+      return;
+    }
 
-    if (!licenseKey.trim()) {
-      Alert.alert("Missing License", "Please verify your license key first.");
+    if (Number(lotSize) <= 0) {
+      Alert.alert("Invalid Lot Size", "Lot size must be greater than 0.");
+      return;
+    }
+
+    if (Number(maxOpenTrades) <= 0) {
+      Alert.alert("Invalid Value", "Max open trades must be at least 1.");
       return;
     }
 
@@ -215,9 +203,7 @@ export default function SymbolsScreen({
 
       const response = await fetch(`${API_BASE_URL}/client/symbols/save`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           license_key: licenseKey,
           symbol_name: selectedSymbol,
@@ -232,13 +218,11 @@ export default function SymbolsScreen({
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        Alert.alert(
-          "Save Failed",
-          data?.detail || "Could not save symbol settings."
-        );
+        Alert.alert("Save Failed", data?.detail || "Failed to save symbol settings.");
         return;
       }
 
+      // Update local state
       setConfiguredPairs((prev) => ({
         ...prev,
         [selectedSymbol]: {
@@ -252,13 +236,10 @@ export default function SymbolsScreen({
       }));
 
       onSymbolsStatusChange?.(true);
-      Alert.alert("Success", "Symbol settings saved successfully.");
+      Alert.alert("Success", `${selectedSymbol} configured successfully.`);
       closeConfigModal();
     } catch (error) {
-      Alert.alert(
-        "Connection Error",
-        "Could not reach the server. Please check your internet or backend."
-      );
+      Alert.alert("Connection Error", "Could not connect to server. Please check your internet.");
     } finally {
       setLoading(false);
     }
@@ -272,11 +253,10 @@ export default function SymbolsScreen({
         style: "destructive",
         onPress: () => {
           setConfiguredPairs((prev) => {
-            const copy = { ...prev };
-            delete copy[symbol];
-            const stillConfigured = Object.keys(copy).length > 0;
-            onSymbolsStatusChange?.(stillConfigured);
-            return copy;
+            const updated = { ...prev };
+            delete updated[symbol];
+            onSymbolsStatusChange?.(Object.keys(updated).length > 0);
+            return updated;
           });
         },
       },
@@ -291,26 +271,25 @@ export default function SymbolsScreen({
       style={styles.container}
     >
       <SafeAreaView style={styles.safe}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Header */}
           <View style={styles.topRow}>
             <View style={styles.leftTop}>
               <Pressable style={styles.backButton} onPress={onBack}>
                 <Ionicons name="arrow-back" size={18} color={Colors.text} />
               </Pressable>
-              <Text style={styles.screenTitle}>NOLIMITZ PRO</Text>
+              <Text style={styles.screenTitle}>{String(robotName).toUpperCase()}</Text>
             </View>
           </View>
 
+          {/* Notice */}
           <GlassCard style={styles.noticeCard}>
             <Text style={styles.noticeText}>
-              This are All the Symbols which this robot can trade. Select the one you
-              want to allow.
+              These are all the symbols this robot can trade. Tap any symbol to configure its settings.
             </Text>
           </GlassCard>
 
+          {/* All Symbols Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>All Symbols</Text>
             <Text style={styles.sectionHint}>Tap to configure</Text>
@@ -319,52 +298,48 @@ export default function SymbolsScreen({
           {availableLoading ? (
             <GlassCard style={styles.emptyCard}>
               <View style={styles.loadingWrap}>
-                <ActivityIndicator color={Colors.primary} />
+                <ActivityIndicator color={Colors.primary} size="large" />
               </View>
             </GlassCard>
           ) : availableSymbols.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No EA symbols found</Text>
+              <Text style={styles.emptyTitle}>No symbols available</Text>
+              <Text style={styles.emptySubtitle}>Check your license or try again later</Text>
             </GlassCard>
           ) : (
             availableSymbols.map((symbol) => (
               <Pressable key={symbol} onPress={() => openConfigModal(symbol)}>
                 <GlassCard style={styles.pairCard}>
                   <Text style={styles.pairName}>{symbol}</Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color="rgba(255,255,255,0.75)"
-                  />
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
                 </GlassCard>
               </Pressable>
             ))
           )}
 
+          {/* Allowed / Configured Symbols */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Allowed Symbols</Text>
-            <Text style={styles.sectionHint}>{configuredList.length} selected</Text>
+            <Text style={styles.sectionHint}>{configuredList.length} configured</Text>
           </View>
 
           {listLoading ? (
             <GlassCard style={styles.emptyCard}>
               <View style={styles.loadingWrap}>
-                <ActivityIndicator color={Colors.primary} />
+                <ActivityIndicator color={Colors.primary} size="large" />
               </View>
             </GlassCard>
           ) : configuredList.length === 0 ? (
             <GlassCard style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No symbols allowed yet</Text>
+              <Text style={styles.emptyTitle}>No symbols configured yet</Text>
+              <Text style={styles.emptySubtitle}>Tap symbols above to start trading</Text>
             </GlassCard>
           ) : (
             configuredList.map((item) => (
               <GlassCard key={item.symbol} style={styles.allowedCard}>
                 <Text style={styles.allowedSymbol}>{item.symbol}</Text>
 
-                <Pressable
-                  onPress={() => removeAllowedPair(item.symbol)}
-                  style={styles.removePill}
-                >
+                <Pressable onPress={() => removeAllowedPair(item.symbol)} style={styles.removePill}>
                   <Ionicons name="trash-outline" size={14} color="#FF8EA3" />
                   <Text style={styles.removeText}>Remove</Text>
                 </Pressable>
@@ -373,72 +348,55 @@ export default function SymbolsScreen({
           )}
         </ScrollView>
 
-        <Modal
-          visible={!!selectedSymbol}
-          transparent
-          animationType="fade"
-          onRequestClose={closeConfigModal}
-        >
+        {/* Configuration Modal */}
+        <Modal visible={!!selectedSymbol} transparent animationType="fade" onRequestClose={closeConfigModal}>
           <View style={styles.modalOverlay}>
             <GlassCard style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalTitle}>{selectedSymbol}</Text>
-                  <Text style={styles.modalSubTitle}>Configure this trading pair</Text>
+                  <Text style={styles.modalSubTitle}>Configure trading parameters</Text>
                 </View>
-
                 <Pressable onPress={closeConfigModal} style={styles.modalClose}>
-                  <Ionicons name="close" size={18} color={Colors.text} />
+                  <Ionicons name="close" size={20} color={Colors.text} />
                 </Pressable>
               </View>
 
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.modalContent}
-              >
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalContent}>
+                {/* Lot Size */}
                 <View style={styles.inputWrap}>
                   <Text style={styles.label}>Lot Size</Text>
                   <TextInput
                     value={lotSize}
                     onChangeText={setLotSize}
                     placeholder="0.01"
-                    placeholderTextColor="rgba(255,255,255,0.38)"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
                     style={styles.input}
                     keyboardType="decimal-pad"
                     editable={!loading}
                   />
                 </View>
 
+                {/* Direction */}
                 <View style={styles.inputWrap}>
-                  <Text style={styles.label}>Direction</Text>
+                  <Text style={styles.label}>Trade Direction</Text>
                   <View style={styles.optionRow}>
-                    {(["buy", "sell", "both"] as DirectionType[]).map((item) => {
-                      const active = direction === item;
-
-                      return (
-                        <Pressable
-                          key={item}
-                          onPress={() => setDirection(item)}
-                          style={[
-                            styles.optionButton,
-                            active && styles.optionButtonActive,
-                          ]}
-                          disabled={loading}
-                        >
-                          <Text
-                            style={[
-                              styles.optionText,
-                              active && styles.optionTextActive,
-                            ]}
-                          >
-                            {item.toUpperCase()}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {(["buy", "sell", "both"] as const).map((dir) => (
+                      <Pressable
+                        key={dir}
+                        onPress={() => setDirection(dir)}
+                        style={[styles.optionButton, direction === dir && styles.optionButtonActive]}
+                        disabled={loading}
+                      >
+                        <Text style={[styles.optionText, direction === dir && styles.optionTextActive]}>
+                          {dir.toUpperCase()}
+                        </Text>
+                      </Pressable>
+                    ))}
                   </View>
                 </View>
 
+                {/* Platform */}
                 <View style={styles.platformWrap}>
                   <Text style={styles.label}>Platform</Text>
                   <View style={styles.platformPill}>
@@ -446,38 +404,37 @@ export default function SymbolsScreen({
                   </View>
                 </View>
 
+                {/* Number of Trades per Signal */}
                 <View style={styles.inputWrap}>
-                  <Text style={styles.label}>Number of Trades</Text>
+                  <Text style={styles.label}>Trades per Signal</Text>
                   <TextInput
                     value={trades}
                     onChangeText={setTrades}
                     placeholder="1"
-                    placeholderTextColor="rgba(255,255,255,0.38)"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
                     style={styles.input}
                     keyboardType="number-pad"
                     editable={!loading}
                   />
                 </View>
 
+                {/* Max Open Trades */}
                 <View style={styles.inputWrap}>
                   <Text style={styles.label}>Max Open Trades</Text>
                   <TextInput
                     value={maxOpenTrades}
                     onChangeText={setMaxOpenTrades}
                     placeholder="1"
-                    placeholderTextColor="rgba(255,255,255,0.38)"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
                     style={styles.input}
                     keyboardType="number-pad"
                     editable={!loading}
                   />
                 </View>
 
+                {/* Action Buttons */}
                 <View style={styles.modalButtons}>
-                  <Pressable
-                    style={styles.cancelButton}
-                    onPress={closeConfigModal}
-                    disabled={loading}
-                  >
+                  <Pressable style={styles.cancelButton} onPress={closeConfigModal} disabled={loading}>
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </Pressable>
 
@@ -486,11 +443,7 @@ export default function SymbolsScreen({
                     onPress={savePairConfig}
                     disabled={loading}
                   >
-                    {loading ? (
-                      <ActivityIndicator color="#062B3D" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>Save Pair</Text>
-                    )}
+                    {loading ? <ActivityIndicator color="#062B3D" /> : <Text style={styles.saveButtonText}>Save Configuration</Text>}
                   </Pressable>
                 </View>
               </ScrollView>
@@ -510,13 +463,8 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  topRow: {
-    marginBottom: 18,
-  },
-  leftTop: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  topRow: { marginBottom: 18 },
+  leftTop: { flexDirection: "row", alignItems: "center" },
   backButton: {
     width: 40,
     height: 40,
@@ -553,19 +501,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
-    marginTop: 2,
+    marginVertical: 12,
   },
-  sectionTitle: {
-    color: "#F6FBFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  sectionHint: {
-    color: "rgba(214,234,255,0.82)",
-    fontSize: 12,
-    fontWeight: "700",
-  },
+  sectionTitle: { color: "#F6FBFF", fontSize: 18, fontWeight: "900" },
+  sectionHint: { color: "rgba(214,234,255,0.82)", fontSize: 12, fontWeight: "700" },
 
   pairCard: {
     paddingVertical: 18,
@@ -578,29 +517,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  pairName: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
-
-  emptyCard: {
-    padding: 18,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  emptyTitle: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  loadingWrap: {
-    minHeight: 80,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  pairName: { color: "#FFFFFF", fontSize: 18, fontWeight: "900", letterSpacing: 0.3 },
 
   allowedCard: {
     paddingVertical: 18,
@@ -613,11 +530,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  allowedSymbol: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-  },
+  allowedSymbol: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" },
+
   removePill: {
     flexDirection: "row",
     alignItems: "center",
@@ -629,46 +543,42 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 999,
   },
-  removeText: {
-    color: "#FF9DB0",
-    fontSize: 12,
-    fontWeight: "800",
-  },
+  removeText: { color: "#FF9DB0", fontSize: 12, fontWeight: "800" },
 
+  emptyCard: {
+    padding: 24,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+  },
+  emptyTitle: { color: Colors.text, fontSize: 16, fontWeight: "800", marginBottom: 4 },
+  emptySubtitle: { color: "rgba(255,255,255,0.6)", fontSize: 13, textAlign: "center" },
+  loadingWrap: { minHeight: 100, alignItems: "center", justifyContent: "center" },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.62)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "center",
-    padding: 22,
+    padding: 20,
   },
   modalCard: {
     borderRadius: 24,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(9,18,42,0.96)",
-    maxHeight: "78%",
-  },
-  modalContent: {
-    paddingBottom: 6,
+    backgroundColor: "rgba(9,18,42,0.98)",
+    maxHeight: "82%",
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  modalTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  modalSubTitle: {
-    color: "rgba(230,242,255,0.82)",
-    fontSize: 13,
-    marginTop: 3,
-    fontWeight: "600",
-  },
+  modalTitle: { color: "#FFFFFF", fontSize: 24, fontWeight: "900" },
+  modalSubTitle: { color: "rgba(230,242,255,0.82)", fontSize: 13, marginTop: 4, fontWeight: "600" },
   modalClose: {
     width: 38,
     height: 38,
@@ -678,19 +588,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  inputWrap: {
-    marginBottom: 14,
-  },
-  label: {
-    color: "#F0F7FF",
-    fontSize: 13,
-    marginBottom: 8,
-    fontWeight: "700",
-  },
+  modalContent: { paddingBottom: 10 },
+  inputWrap: { marginBottom: 16 },
+  label: { color: "#F0F7FF", fontSize: 13, marginBottom: 8, fontWeight: "700" },
+
   input: {
     backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     color: "#FFFFFF",
     borderWidth: 1,
@@ -699,16 +604,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  optionRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  optionRow: { flexDirection: "row", gap: 8 },
   optionButton: {
     flex: 1,
     minHeight: 50,
     backgroundColor: "rgba(255,255,255,0.08)",
     borderRadius: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -718,18 +620,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(43,255,197,0.14)",
     borderColor: "rgba(43,255,197,0.34)",
   },
-  optionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  optionTextActive: {
-    color: "#67FFC8",
-  },
+  optionText: { color: "#FFFFFF", fontSize: 13, fontWeight: "900" },
+  optionTextActive: { color: "#67FFC8" },
 
-  platformWrap: {
-    marginBottom: 14,
-  },
+  platformWrap: { marginBottom: 16 },
   platformPill: {
     minHeight: 50,
     borderRadius: 16,
@@ -739,20 +633,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  platformPillText: {
-    color: "#67FFC8",
-    fontSize: 14,
-    fontWeight: "900",
-  },
+  platformPillText: { color: "#67FFC8", fontSize: 14, fontWeight: "900" },
 
   modalButtons: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
+    gap: 12,
+    marginTop: 12,
   },
   cancelButton: {
     flex: 1,
-    height: 50,
+    height: 52,
     borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
@@ -760,25 +650,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cancelButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
+  cancelButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
+
   saveButton: {
     flex: 1,
-    height: 50,
+    height: 52,
     borderRadius: 16,
     backgroundColor: "#8BFFB8",
     alignItems: "center",
     justifyContent: "center",
   },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    color: "#062B3D",
-    fontSize: 14,
-    fontWeight: "900",
-  },
+  saveButtonDisabled: { opacity: 0.65 },
+  saveButtonText: { color: "#062B3D", fontSize: 14, fontWeight: "900" },
 });

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import EntryScreen from "./src/screens/EntryScreen";
 import LicenseKeyScreen from "./src/screens/LicenseKeyScreen";
 import MainTabs from "./src/navigation/MainTabs";
+import * as SecureStore from "expo-secure-store";
 
 type AppScreen = "entry" | "license" | "dashboard";
 type ReturnTarget = "entry" | "dashboard";
@@ -15,6 +16,8 @@ type LicenseBranding = {
   logoUrl: string;
   companyName: string;
 };
+
+const STORAGE_KEY = "nolimitz_user_session";
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>("entry");
@@ -31,18 +34,51 @@ export default function App() {
     companyName: "",
   });
 
+  const [loading, setLoading] = useState(true);
+
+  // ✅ LOAD SAVED SESSION (AUTO LOGIN)
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const saved = await SecureStore.getItemAsync(STORAGE_KEY);
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setBranding(parsed);
+          setScreen("dashboard");
+        }
+      } catch (e) {
+        console.log("Session load error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSession();
+  }, []);
+
+  // 🔥 OPEN LICENSE FROM ENTRY
   const openLicenseFromEntry = () => {
     setLicenseReturnTarget("entry");
     setScreen("license");
   };
 
+  // 🔥 OPEN LICENSE FROM DASHBOARD
   const openLicenseFromDashboard = () => {
     setLicenseReturnTarget("dashboard");
     setScreen("license");
   };
 
-  const handleVerified = (data: LicenseBranding) => {
+  // ✅ AFTER VERIFY → SAVE SESSION
+  const handleVerified = async (data: LicenseBranding) => {
     setBranding(data);
+
+    try {
+      await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.log("Session save error:", e);
+    }
+
     setScreen("dashboard");
   };
 
@@ -50,7 +86,14 @@ export default function App() {
     setScreen(licenseReturnTarget === "dashboard" ? "dashboard" : "entry");
   };
 
-  const handleDeleteRobot = () => {
+  // ❌ DELETE ROBOT → CLEAR SESSION
+  const handleDeleteRobot = async () => {
+    try {
+      await SecureStore.deleteItemAsync(STORAGE_KEY);
+    } catch (e) {
+      console.log("Session delete error:", e);
+    }
+
     setBranding({
       licenseKey: "",
       robotName: "",
@@ -60,8 +103,12 @@ export default function App() {
       logoUrl: "",
       companyName: "",
     });
+
     setScreen("entry");
   };
+
+  // 🔄 LOADING SCREEN (important)
+  if (loading) return null;
 
   if (screen === "entry") {
     return <EntryScreen onAddEA={openLicenseFromEntry} />;

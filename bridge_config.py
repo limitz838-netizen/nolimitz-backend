@@ -1,4 +1,4 @@
-BACKEND_URL = "http://127.0.0.1:8001"
+BACKEND_URL = "https://nolimitz-backend-yfne.onrender.com"
 ADMIN_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhZG1pbl9pZCI6MSwiZW1haWwiOiJzdXBlcmFkbWluQG5vbGltaXR6LmNvbSIsInJvbGUiOiJzdXBlcl9hZG1pbiIsImV4cCI6MTc3NTIzNjQ2OH0.O900PNmXw7AvwFhhm2SQ1PMsr1ulfembyoSl4tWehK8"
 
 MT5_TERMINAL_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"

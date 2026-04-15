@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 import MetaTrader5 as mt5
 import traceback
@@ -11,7 +11,11 @@ import subprocess
 app = FastAPI(title="MT5 Verification Service")
 
 mt5_lock = threading.Lock()
+
 MT5_TERMINAL_PATH = r"C:\Users\user\Desktop\NolimitzMT5Verifier\terminal64.exe"
+
+# Add your own secret here and use same secret from backend
+VERIFIER_SECRET = "nolimitz_super_secure_9283_!@#_mt5_bridge"
 
 
 class MT5VerifyRequest(BaseModel):
@@ -96,79 +100,77 @@ def verify_mt5_credentials_direct(
     terminal_path: str | None = None,
 ):
     with mt5_lock:
+        login_value = str(mt_login).strip()
+        password_value = str(mt_password).strip()
+        server_value = str(mt_server).strip()
+        final_terminal_path = terminal_path or MT5_TERMINAL_PATH
+
+        if not login_value or not password_value or not server_value:
+            raise Exception("Login, password, and server are required.")
+
         try:
-            login_value = str(mt_login).strip()
-            password_value = str(mt_password).strip()
-            server_value = str(mt_server).strip()
-            final_terminal_path = terminal_path or MT5_TERMINAL_PATH
+            login_int = int(login_value)
+        except ValueError:
+            raise Exception("Login must be a valid number.")
 
-            if not login_value or not password_value or not server_value:
-                raise Exception("Login, password, and server are required.")
+        if not os.path.exists(final_terminal_path):
+            raise Exception(f"MT5 terminal not found at: {final_terminal_path}")
 
-            try:
-                login_int = int(login_value)
-            except ValueError:
-                raise Exception("Login must be a valid number.")
+        hard_reset_terminal()
 
-            if not os.path.exists(final_terminal_path):
-                raise Exception(f"MT5 terminal not found at: {final_terminal_path}")
+        initialized, last_init_error = initialize_terminal(final_terminal_path)
+        if not initialized:
+            raise Exception(f"MT5 initialize failed: {last_init_error}")
 
-            # full reset before every verification
+        time.sleep(2.0)
+
+        authorized = mt5.login(
+            login=login_int,
+            password=password_value,
+            server=server_value,
+            timeout=60000,
+        )
+
+        if not authorized:
+            error_info = mt5.last_error()
             hard_reset_terminal()
+            raise Exception(normalize_error_message(error_info))
 
-            initialized, last_init_error = initialize_terminal(final_terminal_path)
-            if not initialized:
-                raise Exception(f"MT5 initialize failed: {last_init_error}")
+        time.sleep(1.5)
 
-            time.sleep(2.0)
-
-            authorized = mt5.login(
-                login=login_int,
-                password=password_value,
-                server=server_value,
-                timeout=60000,
-            )
-
-            if not authorized:
-                error_info = mt5.last_error()
-
-                # important: hard reset so next correct save is not poisoned
-                hard_reset_terminal()
-
-                raise Exception(normalize_error_message(error_info))
-
-            time.sleep(1.5)
-
-            account_info = mt5.account_info()
-            if account_info is None:
-                error_info = mt5.last_error()
-                hard_reset_terminal()
-                raise Exception(normalize_error_message(error_info))
-
-            if str(account_info.login) != str(login_int):
-                hard_reset_terminal()
-                raise Exception("Wrong MT5 login, password, or server. Please check your account details and try again.")
-
-            result = {
-                "success": True,
-                "message": "MT5 account connected successfully",
-                "login": str(account_info.login),
-                "server": account_info.server,
-                "balance": str(account_info.balance),
-                "equity": str(account_info.equity),
-                "name": account_info.name,
-                "broker_name": account_info.company,
-            }
-
+        account_info = mt5.account_info()
+        if account_info is None:
+            error_info = mt5.last_error()
             hard_reset_terminal()
-            return result
+            raise Exception(normalize_error_message(error_info))
 
-        except Exception:
-            raise
+        if str(account_info.login) != str(login_int):
+            hard_reset_terminal()
+            raise Exception("Wrong MT5 login, password, or server. Please check your account details and try again.")
+
+        result = {
+            "success": True,
+            "message": "MT5 account connected successfully",
+            "login": str(account_info.login),
+            "server": account_info.server,
+            "balance": str(account_info.balance),
+            "equity": str(account_info.equity),
+            "name": account_info.name,
+            "broker_name": account_info.company,
+        }
+
+        hard_reset_terminal()
+        return result
 
 
 @app.post("/verify-mt5")
-def verify_mt5(data: MT5VerifyRequest):
+def verify_mt5(
+    data: MT5VerifyRequest,
+    x_verifier_secret: str | None = Header(default=None),
+):
+    if x_verifier_secret != VERIFIER_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     try:
         return verify_mt5_credentials_direct(
             mt_login=data.login,
@@ -177,11 +179,8 @@ def verify_mt5(data: MT5VerifyRequest):
         )
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(
-            status_code=401,
-            detail=str(e),
-        )
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 if __name__ == "__main__":
-    uvicorn.run("mt5_service:app", host="127.0.0.1", port=8011, reload=False)
+    uvicorn.run("mt5_service:app", host="0.0.0.0", port=8011, reload=False)
