@@ -165,13 +165,7 @@ def verify_mt5_credentials_direct(
 from fastapi import FastAPI, HTTPException, Header
 
 @app.post("/verify-mt5")
-def verify_mt5(
-    data: MT5VerifyRequest,
-    x_api_key: str = Header(None),
-):
-    if x_api_key != VERIFIER_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
+def verify_mt5(data: MT5VerifyRequest):
     try:
         return verify_mt5_credentials_direct(
             mt_login=data.login,
