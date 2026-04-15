@@ -2,22 +2,22 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
-from fastapi.openapi.utils import get_openapi
 
-from app.database import Base, engine, SessionLocal
-from app.models import Admin, AdminProfile
 from app.auth import hash_password
+from app.database import Base, SessionLocal, engine
+from app.models import Admin, AdminProfile
+from app.routers import mt5_workers
 from app.routers.admin import router as admin_router
+from app.routers.client import router as client_router
+from app.routers.copier import router as copier_router
 from app.routers.ea import router as ea_router
 from app.routers.license import router as license_router
-from app.routers.client import router as client_router
-from app.routers.signals import router as signals_router
-from app.routers.robot import router as robot_router
-from app.routers.copier import router as copier_router
-from app.routers import mt5_workers
 from app.routers.master_account import router as master_account_router
+from app.routers.robot import router as robot_router
+from app.routers.signals import router as signals_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -34,28 +34,30 @@ def seed_super_admin():
     db: Session = SessionLocal()
     try:
         existing = db.query(Admin).filter(Admin.email == email).first()
-        if not existing:
-            super_admin = Admin(
-                admin_code=100,
-                full_name="Super Admin",
-                email=email,
-                password_hash=hash_password(password),
-                role="super_admin",
-                is_approved=True,
-                is_active=True,
-            )
-            db.add(super_admin)
-            db.commit()
-            db.refresh(super_admin)
+        if existing:
+            return
 
-            profile = AdminProfile(
-                admin_id=super_admin.id,
-                display_name="NolimitzBots",
-                company_name="NolimitzBots",
-                support_email="support@nolimitz.com",
-            )
-            db.add(profile)
-            db.commit()
+        super_admin = Admin(
+            admin_code=100,
+            full_name="Super Admin",
+            email=email,
+            password_hash=hash_password(password),
+            role="super_admin",
+            is_approved=True,
+            is_active=True,
+        )
+        db.add(super_admin)
+        db.commit()
+        db.refresh(super_admin)
+
+        profile = AdminProfile(
+            admin_id=super_admin.id,
+            display_name="NolimitzBots",
+            company_name="NolimitzBots",
+            support_email="support@nolimitz.com",
+        )
+        db.add(profile)
+        db.commit()
     finally:
         db.close()
 
@@ -75,7 +77,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 app.include_router(admin_router)
 app.include_router(ea_router)
@@ -87,9 +89,11 @@ app.include_router(copier_router)
 app.include_router(mt5_workers.router)
 app.include_router(master_account_router)
 
+
 @app.get("/")
-def root(): 
+def root():
     return {"message": "NolimitzBots backend is running"}
+
 
 def custom_openapi():
     if app.openapi_schema:
@@ -102,6 +106,7 @@ def custom_openapi():
         routes=app.routes,
     )
 
+    openapi_schema.setdefault("components", {})
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
@@ -110,9 +115,19 @@ def custom_openapi():
         }
     }
 
-    for path in openapi_schema["paths"]:
-        for method in openapi_schema["paths"][path]:
-            openapi_schema["paths"][path][method]["security"] = [{"BearerAuth": []}]
+    public_routes = {
+        "/",
+        "/admin/login",
+        "/admin/signup",
+        "/openapi.json",
+    }
+
+    for path, path_item in openapi_schema["paths"].items():
+        if path in public_routes:
+            continue
+
+        for method in path_item:
+            path_item[method]["security"] = [{"BearerAuth": []}]
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema

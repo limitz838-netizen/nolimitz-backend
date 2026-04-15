@@ -36,7 +36,7 @@ from app.security import decrypt_text, encrypt_text
 router = APIRouter(prefix="/client", tags=["Client"])
 
 MT5_VERIFY_URL = "https://dazedly-nondark-lise.ngrok-free.dev/verify-mt5"
-MT5_VERIFY_TIMEOUT_SECONDS = 30
+MT5_VERIFY_TIMEOUT_SECONDS = 31
 
 
 # =========================
@@ -89,7 +89,7 @@ def verify_mt5_credentials(mt_login: str, mt_password: str, mt_server: str):
                 "server": mt_server,
             },
             headers={
-                "x-api-key": "nolimitz_mt5_secret_2026"
+                "x-api-key": "nolimitz_mt5_secret_2026",
             },
             timeout=MT5_VERIFY_TIMEOUT_SECONDS,
         )
@@ -206,6 +206,7 @@ def build_trade_history_item(row: TradeExecution) -> ClientTradeHistoryItem:
         created_at=row.created_at,
     )
 
+
 # =========================
 # LICENSE ACTIVATION
 # =========================
@@ -292,9 +293,6 @@ def activate_client_license(
     )
 
 
-# =========================
-# MT5
-# =========================
 # =========================
 # MT5
 # =========================

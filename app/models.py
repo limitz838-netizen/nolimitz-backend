@@ -38,7 +38,7 @@ class MasterAccount(Base):
 
     admin_id = Column(Integer, ForeignKey("admins.id"), nullable=False)
 
-    ea_id = Column(Integer, nullable=False)
+    ea_id = Column(Integer, ForeignKey("expert_advisors.id"), nullable=False, index=True)
 
     mt_login = Column(String, nullable=False)
     mt_password = Column(String, nullable=False)
@@ -52,6 +52,7 @@ class MasterAccount(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     admin = relationship("Admin")
+    ea = relationship("ExpertAdvisor")
 
 class AdminProfile(Base):
     __tablename__ = "admin_profiles"

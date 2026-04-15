@@ -79,6 +79,13 @@ class BasicMessageResponse(BaseModel):
     message: str
 
 
+class DeviceLockResetResponse(BaseModel):
+    message: str
+    license_key: str
+    activated_device_id: Optional[str] = None
+    activated_device_name: Optional[str] = None
+
+
 # =========================
 # EA
 # =========================
@@ -151,7 +158,7 @@ class LicenseCreateRequest(BaseModel):
     ea_id: int
     client_name: str
     client_email: EmailStr
-    duration: str  # 30days, 1month, 1year, lifetime
+    duration: str
 
 
 class LicenseItem(BaseModel):
@@ -169,12 +176,6 @@ class LicenseItem(BaseModel):
 class LicenseResponse(BaseModel):
     message: str
     license: LicenseItem
-
-class DeviceLockResetResponse(BaseModel):
-    message: str
-    license_key: str
-    activated_device_id: Optional[str] = None
-    activated_device_name: Optional[str] = None
 
 
 # =========================
@@ -250,6 +251,7 @@ class ClientMT5StatusResponse(BaseModel):
     status: str
     message: str
 
+
 class MT5WorkerRegisterRequest(BaseModel):
     worker_name: str
     worker_type: str = "both"
@@ -271,6 +273,7 @@ class MT5WorkerResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 # =========================
 # CLIENT SYMBOL SETTINGS
@@ -321,6 +324,7 @@ class ClientTradeHistoryItem(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 # =========================
 # SIGNALS
@@ -487,6 +491,9 @@ class TradeTicketMapItem(BaseModel):
         from_attributes = True
 
 
+# =========================
+# MASTER ACCOUNT
+# =========================
 class MasterAccountSaveRequest(BaseModel):
     ea_id: int
     mt_login: str
