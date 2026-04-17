@@ -248,6 +248,32 @@ export default function AdminDashboardPage() {
       );
     });
   }, [licenses, licenseSearch]);
+  const headerBrandName = useMemo(() => {
+  const displayName = adminProfile?.display_name?.trim();
+  const companyName = adminProfile?.company_name?.trim();
+  const fullName = adminProfile?.full_name?.trim();
+  const emailName = adminProfile?.email?.trim()?.split("@")[0];
+
+  const invalidValues = ["string", "null", "undefined", "none", "n/a"];
+
+  if (displayName && !invalidValues.includes(displayName.toLowerCase())) {
+    return displayName;
+  }
+
+  if (companyName && !invalidValues.includes(companyName.toLowerCase())) {
+    return companyName;
+  }
+
+  if (fullName && !invalidValues.includes(fullName.toLowerCase())) {
+    return fullName;
+  }
+
+  if (emailName && !invalidValues.includes(emailName.toLowerCase())) {
+    return emailName;
+  }
+
+  return "Admin";
+}, [adminProfile]);
   const groupedUsers = useMemo(() => {
     const grouped: Record<
       string,
@@ -954,13 +980,9 @@ function formatDateValue(value?: string | null) {
   <p className="text-[10px] uppercase tracking-[0.22em] text-white/35">
     Dashboard
   </p>
-  <p className="text-sm font-semibold text-white/90">
-    {adminProfile?.display_name ||
-      adminProfile?.company_name ||
-      adminProfile?.full_name ||
-      adminProfile?.email?.split("@")[0] ||
-      "Admin"}
-  </p>
+  <p className="text-lg sm:text-xl font-bold tracking-wide text-white/95">
+  {headerBrandName}
+</p>
 </div>
 </div>
 
@@ -1007,7 +1029,7 @@ function formatDateValue(value?: string | null) {
           <h1 className="mt-4 text-3xl font-black tracking-tight text-white/92 sm:text-4xl">
   Good evening,{" "}
   <span className="bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500 bg-clip-text text-transparent">
-    {adminName}
+    {headerBrandName}
   </span>
 </h1>
 
